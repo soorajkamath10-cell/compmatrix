@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Strength × Impact Map</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2333;
+    --border: #2a3045;
+    --text: #e8eaf2;
+    --muted: #6b7490;
+    --accent: #7c6af7;
+    --accent-soft: rgba(124,106,247,0.12);
+    --green: #36cfb8;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    gap: 24px;
+  }
+
+  header { text-align: center; }
+  header h1 {
+    font-size: 1.5rem; font-weight: 700;
+    letter-spacing: -0.02em; color: var(--text);
+  }
+  header p { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+  .main-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    width: 100%;
+    max-width: 1060px;
+  }
+
+  /* ─── Chart ─── */
+  .chart-wrap { position: relative; flex: 0 0 auto; }
+
+  .chart-outer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 48px 48px 48px 56px;
+    position: relative;
+    user-select: none;
+  }
+
+  #chart-canvas { display: block; cursor: default; }
+
+  .axis-label {
+    position: absolute;
+    font-size: 0.68rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  }
+  .label-x-lo { bottom: 16px; left: 56px; }
+  .label-x-hi { bottom: 16px; right: 48px; }
+  .label-y-lo { top: 48px; left: 10px; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .label-y-hi { bottom: 48px; left: 10px; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .axis-title-x {
+    position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+    font-size: 0.72rem; font-weight: 600; color: var(--accent);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .axis-title-y {
+    position: absolute; top: 50%; left: 2px; transform: translateY(-50%) rotate(-90deg);
+    font-size: 0.72rem; font-weight: 600; color: var(--accent);
+    letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  }
+
+  #place-banner {
+    display: none; position: absolute;
+    top: -36px; left: 0; right: 0;
+    background: var(--accent); color: #fff;
+    font-size: 0.75rem; font-weight: 600; text-align: center;
+    border-radius: 8px 8px 0 0; padding: 6px; letter-spacing: 0.04em;
+  }
+  #place-banner.active { display: block; }
+
+  /* ─── Panel ─── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .panel-section {
+    display: flex; flex-direction: column; gap: 12px;
+    flex: 1; min-width: 200px;
+  }
+  .panel-section.list-section { flex: 2; min-width: 320px; }
+
+  .panel h2 {
+    font-size: 0.78rem; font-weight: 600;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted);
+  }
+
+  /* edit/add form */
+  #form-section h2 { display: flex; align-items: center; gap: 8px; }
+  .form-mode-tag {
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 20px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .form-mode-tag.edit-mode { background: rgba(54,207,184,0.15); color: var(--green); }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+
+  input[type="text"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    font-family: inherit; font-size: 0.82rem;
+    padding: 8px 10px; outline: none;
+    transition: border-color 0.15s; width: 100%;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  .color-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .color-swatch {
+    width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.selected { border-color: #fff; }
+
+  .btn-row { display: flex; gap: 8px; }
+  .btn {
+    padding: 9px 14px; border-radius: 9px; border: none;
+    font-family: inherit; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.02em; flex: 1;
+  }
+  .btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-save { background: var(--green); color: #0f1117; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+  .divider { border: none; border-top: 1px solid var(--border); }
+
+  /* point list */
+  #point-list {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 200px; overflow-y: auto; padding-right: 2px;
+  }
+  #point-list::-webkit-scrollbar { width: 4px; }
+  #point-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .point-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 10px; cursor: pointer;
+    transition: border-color 0.12s;
+  }
+  .point-item:hover { border-color: var(--accent); }
+  .point-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .point-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .point-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .point-name {
+    font-size: 0.78rem; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .point-cat {
+    font-size: 0.65rem; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .point-coords {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.64rem; color: var(--muted); white-space: nowrap; flex-shrink: 0;
+  }
+  .point-del {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.9rem; padding: 0 2px;
+    line-height: 1; transition: color 0.12s; flex-shrink: 0;
+  }
+  .point-del:hover { color: #e85d75; }
+
+  .empty-state {
+    font-size: 0.76rem; color: var(--muted);
+    text-align: center; padding: 12px 0;
+  }
+
+  #tooltip {
+    position: fixed; background: #0f1117ee;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 11px; font-size: 0.74rem; color: var(--text);
+    pointer-events: none; display: none; z-index: 999;
+    max-width: 220px; line-height: 1.5;
+  }
+
+  .instructions {
+    font-size: 0.71rem; color: var(--muted); line-height: 1.6;
+    background: var(--surface2); border-radius: 8px; padding: 10px 12px;
+  }
+  .instructions b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Strength × Impact Map</h1>
+  <p>Plot competencies by personal strength and company impact</p>
+</header>
+
+<div class="main-layout">
+  <div class="chart-wrap">
+    <div id="place-banner">Click on the chart to place this point</div>
+    <div class="chart-outer">
+      <canvas id="chart-canvas" width="900" height="450"></canvas>
+      <span class="axis-label label-x-lo">Low</span>
+      <span class="axis-label label-x-hi">High</span>
+      <span class="axis-label label-y-lo">Low</span>
+      <span class="axis-label label-y-hi">High</span>
+      <span class="axis-title-x">Strength →</span>
+      <span class="axis-title-y">← Company Impact</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <!-- Add / Edit form -->
+    <div class="panel-section" id="form-section">
+      <h2>
+        <span id="form-title">Add Point</span>
+        <span class="form-mode-tag" id="form-mode-tag">New</span>
+      </h2>
+
+      <div class="form-group">
+        <label>Label</label>
+        <input type="text" id="input-label" placeholder="e.g. PM1 – Writing user journeys" />
+      </div>
+      <div class="form-group">
+        <label>Category <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input type="text" id="input-category" placeholder="e.g. Product, Engineering…" />
+      </div>
+      <div class="form-group">
+        <label>Colour</label>
+        <div class="color-row" id="color-row"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-add">Place on Chart →</button>
+        <button class="btn btn-save" id="btn-save" style="display:none">Save Changes</button>
+        <button class="btn btn-ghost" id="btn-cancel" style="display:none">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Point list -->
+    <div class="panel-section list-section">
+      <h2>Points <span id="point-count" style="font-size:0.65rem;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0"></span></h2>
+      <div id="point-list"></div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="panel-section">
+      <h2>How to use</h2>
+      <div class="instructions">
+        1. Fill in a label &amp; pick a colour<br>
+        2. Click <em>Place on Chart</em>, then click where you want it<br>
+        3. <b>Click</b> a dot or list row to select it<br>
+        4. Edit label, category or colour in the panel, then <b>Save</b><br>
+        5. <b>Drag</b> any dot to reposition it
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const COLORS = [
+  '#7c6af7','#36cfb8','#f7a94a','#e85d75',
+  '#4da9f5','#b8e64a','#f76ab0','#ff8c57'
+];
+
+const canvas = document.getElementById('chart-canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const PAD = 40;
+
+let points = [];
+let selectedId = null;
+let dragging = null;
+let dragOffX = 0, dragOffY = 0;
+let placingPoint = null;
+let editingMode = false; // true when the form is in "edit" mode
+
+let formColor = COLORS[0]; // currently selected colour in the form
+
+// ── Color swatches ──────────────────────────────────────────────
+const colorRow = document.getElementById('color-row');
+COLORS.forEach((c, i) => {
+  const sw = document.createElement('button');
+  sw.className = 'color-swatch' + (i === 0 ? ' selected' : '');
+  sw.style.background = c;
+  sw.title = c;
+  sw.dataset.color = c;
+  sw.onclick = () => {
+    formColor = c;
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+    sw.classList.add('selected');
+    // live-update selected point colour
+    if (editingMode && selectedId) {
+      const pt = points.find(p => p.id === selectedId);
+      if (pt) { pt.color = c; renderList(); draw(); }
+    }
+  };
+  colorRow.appendChild(sw);
+});
+
+function setSwatchColor(c) {
+  formColor = c;
+  document.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.classList.toggle('selected', sw.dataset.color === c);
+  });
+}
+
+// ── Form mode switching ──────────────────────────────────────────
+function enterAddMode() {
+  editingMode = false;
+  selectedId = null;
+  document.getElementById('form-title').textContent = 'Add Point';
+  document.getElementById('form-mode-tag').textContent = 'New';
+  document.getElementById('form-mode-tag').className = 'form-mode-tag';
+  document.getElementById('input-label').value = '';
+  document.getElementById('input-category').value = '';
+  setSwatchColor(COLORS[0]);
+  document.getElementById('btn-add').style.display = '';
+  document.getElementById('btn-save').style.display = 'none';
+  document.getElementById('btn-cancel').style.display = 'none';
+  renderList();
+  draw();
+}
+
+function enterEditMode(pt) {
+  editingMode = true;
+  selectedId = pt.id;
+  document.getElementById('form-title').textContent = 'Edit Point';
+  document.getElementById('form-mode-tag').textContent = 'Editing';
+  document.getElementById('form-mode-tag').className = 'form-mode-tag edit-mode';
+  document.getElementById('input-label').value = pt.label;
+  document.getElementById('input-category').value = pt.category || '';
+  setSwatchColor(pt.color);
+  document.getElementById('btn-add').style.display = 'none';
+  document.getElementById('btn-save').style.display = '';
+  document.getElementById('btn-cancel').style.display = '';
+  document.getElementById('input-label').focus();
+  renderList();
+  draw();
+}
+
+// ── Coordinate helpers ──────────────────────────────────────────
+function toCanvas(px, py) {
+  return { x: PAD + px * (W - 2*PAD), y: H - PAD - py * (H - 2*PAD) };
+}
+function fromCanvas(cx, cy) {
+  return { px: (cx - PAD) / (W - 2*PAD), py: (H - PAD - cy) / (H - 2*PAD) };
+}
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+// ── Draw ────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  const mx = W / 2, my = H / 2;
+  const quadrants = [
+    { x: PAD, y: PAD, w: mx-PAD, h: my-PAD, color: 'rgba(124,106,247,0.05)', label: 'Low Strength · High Impact', lx: PAD+8, ly: PAD+14 },
+    { x: mx, y: PAD, w: W-PAD-mx, h: my-PAD, color: 'rgba(54,207,184,0.05)', label: 'High Strength · High Impact', lx: mx+8, ly: PAD+14 },
+    { x: PAD, y: my, w: mx-PAD, h: H-PAD-my, color: 'rgba(107,116,144,0.04)', label: 'Low Strength · Low Impact', lx: PAD+8, ly: my+14 },
+    { x: mx, y: my, w: W-PAD-mx, h: H-PAD-my, color: 'rgba(247,169,74,0.05)', label: 'High Strength · Low Impact', lx: mx+8, ly: my+14 },
+  ];
+  quadrants.forEach(q => {
+    ctx.fillStyle = q.color;
+    ctx.fillRect(q.x, q.y, q.w, q.h);
+    ctx.fillStyle = 'rgba(107,116,144,0.35)';
+    ctx.font = '500 11px Inter, system-ui';
+    ctx.fillText(q.label, q.lx, q.ly);
+  });
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(42,48,69,0.8)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const x = PAD + i * (W - 2*PAD) / 4;
+    const y = PAD + i * (H - 2*PAD) / 4;
+    ctx.beginPath(); ctx.moveTo(x, PAD); ctx.lineTo(x, H-PAD); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W-PAD, y); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(107,116,144,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(PAD, H-PAD); ctx.lineTo(W-PAD, H-PAD); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD, PAD); ctx.lineTo(PAD, H-PAD); ctx.stroke();
+
+  // Centre cross
+  ctx.strokeStyle = 'rgba(107,116,144,0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(W/2, PAD); ctx.lineTo(W/2, H-PAD); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD, H/2); ctx.lineTo(W-PAD, H/2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Points
+  points.forEach(pt => {
+    const {x, y} = toCanvas(pt.px, pt.py);
+    const R = 8;
+    const isSelected = pt.id === selectedId;
+
+    if (isSelected) {
+      const grd = ctx.createRadialGradient(x, y, R, x, y, R+10);
+      grd.addColorStop(0, pt.color + '55');
+      grd.addColorStop(1, pt.color + '00');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(x, y, R+10, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.fillStyle = pt.color;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill();
+
+    if (isSelected) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, R+2.5, 0, Math.PI*2); ctx.stroke();
+    }
+
+    // Label pill
+    ctx.font = '500 11px Inter, system-ui';
+    const labelText = pt.label.length > 50 ? pt.label.slice(0,48)+'…' : pt.label;
+    const tw = ctx.measureText(labelText).width;
+    const pillW = tw + 14, pillH = 20;
+    let pillX = x - pillW/2;
+    let pillY = y - R - pillH - 4;
+    pillX = Math.max(PAD, Math.min(W-PAD-pillW, pillX));
+    if (pillY < PAD) pillY = y + R + 4;
+
+    ctx.fillStyle = 'rgba(15,17,23,0.85)';
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 5);
+    ctx.fill();
+
+    ctx.fillStyle = isSelected ? '#fff' : '#e8eaf2';
+    ctx.fillText(labelText, pillX + 7, pillY + 13);
+  });
+}
+
+// ── Hit detection ────────────────────────────────────────────────
+function getCanvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return { cx: clientX - r.left, cy: clientY - r.top };
+}
+
+function hitPoint(cx, cy) {
+  for (let i = points.length - 1; i >= 0; i--) {
+    const {x, y} = toCanvas(points[i].px, points[i].py);
+    if (Math.hypot(cx-x, cy-y) <= 12) return points[i];
+  }
+  return null;
+}
+
+// ── Mouse events ─────────────────────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+  const {cx, cy} = getCanvasPos(e);
+
+  if (placingPoint) {
+    const {px, py} = fromCanvas(cx, cy);
+    if (px < 0 || px > 1 || py < 0 || py > 1) return;
+    const pt = { ...placingPoint, px: clamp01(px), py: clamp01(py), id: Date.now() };
+    points.push(pt);
+    placingPoint = null;
+    document.getElementById('place-banner').classList.remove('active');
+    canvas.style.cursor = 'default';
+    enterAddMode();
+    return;
+  }
+
+  const hit = hitPoint(cx, cy);
+  if (hit) {
+    dragging = hit;
+    const {x, y} = toCanvas(hit.px, hit.py);
+    dragOffX = cx - x; dragOffY = cy - y;
+    if (selectedId !== hit.id) {
+      enterEditMode(hit);
+    }
+  } else {
+    if (editingMode) enterAddMode();
+    else { selectedId = null; renderList(); draw(); }
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  e.preventDefault();
+  const {cx, cy} = getCanvasPos(e);
+
+  if (dragging) {
+    const {px, py} = fromCanvas(cx - dragOffX, cy - dragOffY);
+    dragging.px = clamp01(px);
+    dragging.py = clamp01(py);
+    draw();
+    updateListCoords(dragging);
+    return;
+  }
+
+  if (placingPoint) return;
+
+  const hit = hitPoint(cx, cy);
+  canvas.style.cursor = hit ? 'grab' : 'default';
+
+  const tooltip = document.getElementById('tooltip');
+  if (hit && hit.id !== selectedId) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY - 10) + 'px';
+    tooltip.innerHTML = `<b>${hit.label}</b>${hit.category ? '<br><span style="color:#6b7490">'+hit.category+'</span>' : ''}<br><span style="color:#6b7490;font-family:monospace;font-size:0.68rem">Str: ${Math.round(hit.px*100)}%  Imp: ${Math.round(hit.py*100)}%</span>`;
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  dragging = null;
+  canvas.style.cursor = 'default';
+});
+
+canvas.addEventListener('mouseleave', () => {
+  document.getElementById('tooltip').style.display = 'none';
+  if (dragging) { dragging = null; canvas.style.cursor = 'default'; }
+});
+
+// ── Add Point button ─────────────────────────────────────────────
+document.getElementById('btn-add').addEventListener('click', () => {
+  const label = document.getElementById('input-label').value.trim();
+  if (!label) {
+    const inp = document.getElementById('input-label');
+    inp.focus(); inp.style.borderColor = '#e85d75';
+    setTimeout(() => inp.style.borderColor = '', 1000);
+    return;
+  }
+  const category = document.getElementById('input-category').value.trim();
+  placingPoint = { label, category, color: formColor };
+  document.getElementById('place-banner').classList.add('active');
+  canvas.style.cursor = 'crosshair';
+});
+
+// ── Save edits ────────────────────────────────────────────────────
+document.getElementById('btn-save').addEventListener('click', () => {
+  if (!selectedId) return;
+  const pt = points.find(p => p.id === selectedId);
+  if (!pt) return;
+  const newLabel = document.getElementById('input-label').value.trim();
+  if (!newLabel) {
+    const inp = document.getElementById('input-label');
+    inp.focus(); inp.style.borderColor = '#e85d75';
+    setTimeout(() => inp.style.borderColor = '', 1000);
+    return;
+  }
+  pt.label = newLabel;
+  pt.category = document.getElementById('input-category').value.trim();
+  pt.color = formColor;
+  enterAddMode();
+});
+
+// ── Cancel edit ───────────────────────────────────────────────────
+document.getElementById('btn-cancel').addEventListener('click', () => {
+  enterAddMode();
+});
+
+// ── Point List ───────────────────────────────────────────────────
+function renderList() {
+  const list = document.getElementById('point-list');
+  list.innerHTML = '';
+  document.getElementById('point-count').textContent = points.length ? `(${points.length})` : '';
+
+  if (!points.length) {
+    list.innerHTML = '<p class="empty-state">No points yet. Add one above!</p>';
+    return;
+  }
+
+  points.forEach(pt => {
+    const item = document.createElement('div');
+    item.className = 'point-item' + (pt.id === selectedId ? ' selected' : '');
+    item.dataset.id = pt.id;
+    item.innerHTML = `
+      <span class="point-dot" style="background:${pt.color}"></span>
+      <span class="point-info">
+        <span class="point-name" title="${pt.label}">${pt.label}</span>
+        ${pt.category ? `<span class="point-cat">${pt.category}</span>` : ''}
+      </span>
+      <span class="point-coords">${Math.round(pt.px*100)}·${Math.round(pt.py*100)}</span>
+      <button class="point-del" title="Remove">✕</button>
+    `;
+
+    item.querySelector('.point-del').addEventListener('click', ev => {
+      ev.stopPropagation();
+      points = points.filter(p => p.id !== pt.id);
+      if (selectedId === pt.id) enterAddMode();
+      else { renderList(); draw(); }
+    });
+
+    item.addEventListener('click', () => {
+      if (selectedId === pt.id) {
+        enterAddMode();
+      } else {
+        enterEditMode(pt);
+      }
+    });
+
+    list.appendChild(item);
+  });
+}
+
+function updateListCoords(pt) {
+  const el = document.querySelector(`.point-item[data-id="${pt.id}"] .point-coords`);
+  if (el) el.textContent = `${Math.round(pt.px*100)}·${Math.round(pt.py*100)}`;
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+points.push(
+  { id: 1,  label: 'Testing and edge cases - Turtle',    category: 'Product', color: '#7c6af7', px: 0.58, py: 0.32 },
+  { id: 2,  label: 'Customer/potential calls',           category: '',        color: '#36cfb8', px: 0.68, py: 0.89 },
+  { id: 3,  label: 'Storytelling (general)',             category: '',        color: '#f7a94a', px: 0.92, py: 0.20 },
+  { id: 4,  label: 'Project/Account mgmt+AP/AR',        category: '',        color: '#36cfb8', px: 0.44, py: 0.64 },
+  { id: 5,  label: 'Proposal building and dev handover', category: '',        color: '#f7a94a', px: 0.73, py: 0.71 },
+  { id: 6,  label: 'LinkedIn and SM content',           category: '',        color: '#4da9f5', px: 0.27, py: 0.47 },
+  { id: 7,  label: 'Outreach and cold email OnlyAEO',   category: '',        color: '#4da9f5', px: 0.09, py: 0.38 },
+  { id: 8,  label: 'Community building (founder)',       category: '',        color: '#f7a94a', px: 0.42, py: 0.76 },
+  { id: 9,  label: 'xxx',                               category: '',        color: '#f7a94a', px: 0.22, py: 0.86 },
+  { id: 10, label: 'Thorough research (STP)',            category: '',        color: '#f7a94a', px: 0.84, py: 0.06 },
+  { id: 11, label: 'Network reachouts (BITS, XLRI)',     category: '',        color: '#f7a94a', px: 0.36, py: 0.54 },
+  { id: 12, label: 'Product inputs',                    category: 'Product', color: '#7c6af7', px: 0.70, py: 0.33 },
+  { id: 13, label: 'Calls to partners/ecosystem',       category: '',        color: '#f7a94a', px: 0.57, py: 0.86 }
+);
+renderList();
+draw();
+</script>
+</body>
+</html>
